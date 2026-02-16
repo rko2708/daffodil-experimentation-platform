@@ -1,0 +1,29 @@
+# Binaries
+bin/
+*.exe
+*.test
+*.prof
+
+# Environment Variables (CRITICAL)
+.env
+.env.local
+.env.*.local
+
+# Dependency directories
+vendor/
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+out/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
