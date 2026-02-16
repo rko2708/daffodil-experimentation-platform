@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"daffodil-experimentation-platform/pkg/config"
 	"daffodil-experimentation-platform/pkg/database"
 
 	"github.com/redis/go-redis/v9"
@@ -23,9 +24,15 @@ var (
 
 func main() {
 	// 1. Setup DB
+	cfg := config.LoadConfig()
+
 	var err error
 	db, err = database.NewPostgresConn(database.DBConfig{
-		Host: "localhost", Port: 5432, User: "user", Password: "password", DBName: "daffodil",
+		Host:     cfg.DBHost,
+		Port:     5432,
+		User:     cfg.DBUser,
+		Password: cfg.DBPassword,
+		DBName:   cfg.DBName,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -47,7 +54,8 @@ func main() {
 	http.HandleFunc("/place-order", handlePlaceOrder)
 
 	log.Println("🚀 Experiment API started on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":"+cfg.APIPort, enableCORS(http.DefaultServeMux)))
+
 }
 
 func getExperiments(w http.ResponseWriter, r *http.Request) {
@@ -162,4 +170,17 @@ func handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("✅ Produced %d orders for %s to Kafka", req.Count, req.UserID)
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3001")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

@@ -35,3 +35,22 @@ seed-data: ## Pump 30 orders for User U1 to trigger Power User status
 		echo '{"user_id": "U1", "amount": 150.0}' | docker exec -i $(shell docker ps -qf "name=kafka") /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server 127.0.0.1:9092 --topic order_events; \
 	done
 	@echo "✅ Done. Now run 'make cron' to update segments."
+
+# Run everything for development
+dev-backend:
+	go run cmd/api/main.go
+
+dev-frontend:
+	cd dashboard && npm run dev
+
+dev-worker:
+	go run cmd/worker/main.go
+
+# Install all dependencies at once
+install:
+	go mod download
+	cd dashboard && npm install
+
+# Start the infrastructure
+infra:
+	docker-compose up -d
