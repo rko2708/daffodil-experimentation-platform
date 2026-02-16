@@ -37,6 +37,14 @@ export default function Dashboard() {
     }, 2000);
   };
 
+  const handleSync = async () => {
+    setLoading(true);
+    await fetch("http://localhost:8080/evaluate", { method: 'POST' });
+    const newExp = await api.getExperiments(selectedUser!);
+    setExp(newExp);
+    setLoading(false);
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserId) return;
@@ -100,6 +108,12 @@ export default function Dashboard() {
                 className="bg-orange-600 hover:bg-orange-500 px-6 py-3 rounded-full font-bold transition-all disabled:opacity-50"
               >
                 {loading ? 'Processing...' : '🚀 Place 30 Orders'}
+              </button>
+              <button 
+                onClick={handleSync}
+                className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-full font-bold ml-2"
+              >
+                🔄 Sync Segments
               </button>
             </header>
 

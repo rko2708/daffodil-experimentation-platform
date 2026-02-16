@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"daffodil-experimentation-platform/internal/service"
 	"daffodil-experimentation-platform/pkg/config"
 	"daffodil-experimentation-platform/pkg/database"
 
@@ -52,6 +53,7 @@ func main() {
 	http.HandleFunc("/experiments", getExperiments)
 	http.HandleFunc("/users", handleUsers)
 	http.HandleFunc("/place-order", handlePlaceOrder)
+	http.HandleFunc("/evaluate", runEvaluation)
 
 	log.Println("🚀 Experiment API started on :8080")
 	log.Fatal(http.ListenAndServe(":"+cfg.APIPort, enableCORS(http.DefaultServeMux)))
@@ -170,6 +172,20 @@ func handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("✅ Produced %d orders for %s to Kafka", req.Count, req.UserID)
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func runEvaluation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		return
+	}
+
+	// Use the shared service
+	err := service.RunEvaluation(ctx, db, rdb)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func enableCORS(next http.Handler) http.Handler {
