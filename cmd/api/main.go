@@ -143,8 +143,9 @@ func handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		UserID string `json:"user_id"`
-		Count  int    `json:"count"` // Allow sending multiple orders at once
+		UserID      string `json:"user_id"`
+		Count       int    `json:"count"`
+		InstantSync bool   `json:"instant_sync"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
@@ -154,8 +155,9 @@ func handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 
 	for i := 0; i < req.Count; i++ {
 		msg := map[string]interface{}{
-			"user_id": req.UserID,
-			"amount":  100.0,
+			"user_id":      req.UserID,
+			"amount":       100.0,
+			"instant_sync": req.InstantSync && (i == req.Count-1),
 		}
 		msgBytes, _ := json.Marshal(msg)
 

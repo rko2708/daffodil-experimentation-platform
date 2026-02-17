@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS user_metrics (
     order_count_total INTEGER DEFAULT 0,
     orders_23d INTEGER DEFAULT 0,
     last_order_at TIMESTAMP WITH TIME ZONE,
-    location_tag VARCHAR(100),
+    location_tag VARCHAR(100) DEFAULT 'unknown',
+    total_spend DECIMAL(12, 2) DEFAULT 0.00,
     ltv DECIMAL(12, 2) DEFAULT 0.00,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

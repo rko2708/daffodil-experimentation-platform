@@ -3,11 +3,13 @@ import { useState, useEffect } from 'react';
 import { api, ExperimentResponse } from '@/lib/api';
 
 export default function Dashboard() {
-  const [users, setUsers] = useState<{user_id: string, orders: number}[]>([]);
+  const [users, setUsers] = useState<{ user_id: string, orders: number }[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [exp, setExp] = useState<ExperimentResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [newUserId, setNewUserId] = useState('');
+  const [orderCount, setOrderCount] = useState<number>(1);
+  const [isInstant, setIsInstant] = useState(true);
 
   // Load users on mount
   const refreshUsers = async () => {
@@ -27,14 +29,22 @@ export default function Dashboard() {
   const handleSimulateOrders = async () => {
     if (!selectedUser) return;
     setLoading(true);
-    await api.placeOrders(selectedUser, 30);
-    // Give the worker/cron a second to process
-    setTimeout(async () => {
-      await refreshUsers();
-      const newExp = await api.getExperiments(selectedUser);
-      setExp(newExp);
+
+    // We now pass the dynamic count and the instant flag
+    await api.placeOrders(selectedUser, orderCount, isInstant);
+
+    if (isInstant) {
+      // Wait briefly for the worker to finish, then refresh
+      setTimeout(async () => {
+        await refreshUsers();
+        const newExp = await api.getExperiments(selectedUser);
+        setExp(newExp);
+        setLoading(false);
+      }, 1000);
+    } else {
       setLoading(false);
-    }, 2000);
+      alert("Order placed in background. Wait for Cron or click 'Sync' to see changes.");
+    }
   };
 
   const handleSync = async () => {
@@ -48,7 +58,7 @@ export default function Dashboard() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserId) return;
-    
+
     await api.createUser(newUserId);
     setNewUserId('');
     await refreshUsers(); // Refresh the list
@@ -62,8 +72,8 @@ export default function Dashboard() {
 
         <form onSubmit={handleCreateUser} className="mb-8">
           <div className="flex flex-col gap-2">
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Enter User ID (e.g. U99)"
               value={newUserId}
               onChange={(e) => setNewUserId(e.target.value.toUpperCase())}
@@ -77,7 +87,7 @@ export default function Dashboard() {
 
         <div className="space-y-3">
           {users.map(u => (
-            <button 
+            <button
               key={u.user_id}
               onClick={() => setSelectedUser(u.user_id)}
               className={`w-full text-left p-4 rounded-lg border ${selectedUser === u.user_id ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-900 border-gray-800 hover:border-gray-600'}`}
@@ -102,14 +112,37 @@ export default function Dashboard() {
                 <h1 className="text-3xl font-black">User: {selectedUser}</h1>
                 <p className="text-gray-400">Current Segments: {exp?.segments.join(', ') || 'None'}</p>
               </div>
-              <button 
-                onClick={handleSimulateOrders}
-                disabled={loading}
-                className="bg-orange-600 hover:bg-orange-500 px-6 py-3 rounded-full font-bold transition-all disabled:opacity-50"
-              >
-                {loading ? 'Processing...' : '🚀 Place 30 Orders'}
-              </button>
-              <button 
+              <div className="flex flex-col gap-4 bg-gray-900 p-6 rounded-xl border border-gray-800 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Number of Orders</label>
+                    <input
+                      type="number"
+                      value={orderCount}
+                      onChange={(e) => setOrderCount(parseInt(e.target.value) || 0)}
+                      className="w-full bg-black border border-gray-700 rounded px-4 py-2 text-xl font-mono focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSimulateOrders}
+                    disabled={loading}
+                    className="bg-orange-600 hover:bg-orange-500 px-8 py-4 mt-5 rounded-lg font-black transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {loading ? 'Processing...' : `🚀 Place ${orderCount} Orders`}
+                  </button>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isInstant}
+                    onChange={(e) => setIsInstant(e.target.checked)}
+                    className="w-4 h-4 accent-orange-500"
+                  />
+                  <span className="text-sm text-gray-400 font-medium">Use "Hot Path" (Instant Segment Refresh)</span>
+                </label>
+              </div>
+              <button
                 onClick={handleSync}
                 className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-full font-bold ml-2"
               >

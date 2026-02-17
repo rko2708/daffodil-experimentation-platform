@@ -5,19 +5,26 @@ import (
 	"encoding/json"
 	"log"
 
+	"daffodil-experimentation-platform/internal/service" // Ensure this path is correct
 	"daffodil-experimentation-platform/pkg/database"
 
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
 
+// Updated to include the InstantSync flag and Location from our previous discussion
 type OrderEvent struct {
-	UserID string  `json:"user_id"`
-	Amount float64 `json:"amount"`
+	UserID      string  `json:"user_id"`
+	Amount      float64 `json:"amount"`
+	Location    string  `json:"location"`
+	InstantSync bool    `json:"instant_sync"`
 }
 
 func main() {
-	// 1. Setup Postgres Connection
+	ctx := context.Background()
+
+	// 1. Setup Postgres
 	cfg := database.DBConfig{
 		Host:     "localhost",
 		Port:     5432,
@@ -25,29 +32,32 @@ func main() {
 		Password: "password",
 		DBName:   "daffodil",
 	}
-
 	db, err := database.NewPostgresConn(cfg)
 	if err != nil {
 		log.Fatal("Could not connect to DB:", err)
 	}
 	defer db.Close()
 
-	// 2. Setup Kafka Reader
+	// 2. Setup Redis (NEW: Needed for the worker to update the cache)
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	defer rdb.Close()
+
+	// 3. Setup Kafka Reader
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  []string{"127.0.0.1:9092"},
 		Topic:    "order_events",
 		GroupID:  "metrics-group",
-		MinBytes: 10e3, // 10KB
-		MaxBytes: 10e6, // 10MB
+		MinBytes: 10e3,
+		MaxBytes: 10e6,
 	})
 	defer reader.Close()
 
-	log.Println("Worker started: Listening for order events...")
+	log.Println("🚀 Worker started: Listening for order events...")
 
 	for {
-		log.Println("inside...")
-		// Read Message
-		m, err := reader.ReadMessage(context.Background())
+		m, err := reader.ReadMessage(ctx)
 		if err != nil {
 			log.Printf("Error reading message: %v", err)
 			continue
@@ -59,23 +69,34 @@ func main() {
 			continue
 		}
 
-		// 3. Upsert User Metrics
-		// We increment order_count_total and orders_23d, and update LTV
+		log.Printf("📥 Received Event: User=%s, InstantSync=%v", event.UserID, event.InstantSync)
+
+		// 4. Update Database (Matches your new schema)
 		query := `
-			INSERT INTO user_metrics (user_id, order_count_total, orders_23d, ltv, last_order_at, updated_at)
-			VALUES ($1, 1, 1, $2, NOW(), NOW())
-			ON CONFLICT (user_id) DO UPDATE SET
-				order_count_total = user_metrics.order_count_total + 1,
-				orders_23d = user_metrics.orders_23d + 1,
-				ltv = user_metrics.ltv + EXCLUDED.ltv,
-				last_order_at = NOW(),
-				updated_at = NOW();
-		`
-		_, err = db.Exec(query, event.UserID, event.Amount)
+            INSERT INTO user_metrics (user_id, orders_23d, total_spend, location_tag)
+            VALUES ($1, 1, $2, $3)
+            ON CONFLICT (user_id) DO UPDATE SET
+                orders_23d = user_metrics.orders_23d + 1,
+                total_spend = user_metrics.total_spend + EXCLUDED.total_spend,
+                location_tag = EXCLUDED.location_tag,
+                last_updated = NOW();
+        `
+		_, err = db.Exec(query, event.UserID, event.Amount, event.Location)
+
 		if err != nil {
 			log.Printf("Failed to update DB: %v", err)
-		} else {
-			log.Printf("Updated metrics for user: %s", event.UserID)
+			continue
+		}
+		log.Printf("Updated metrics for user: %s", event.UserID)
+
+		// 5. TRIGGER EVALUATION (The Missing Link)
+		// If the event is marked for InstantSync (Hot Path), we re-calculate segments immediately
+		if event.InstantSync {
+			log.Printf("⚡ [HOT PATH] Re-evaluating segments for: %s", event.UserID)
+			err = service.EvaluateSpecificUser(ctx, db, rdb, event.UserID)
+			if err != nil {
+				log.Printf("Error in evaluation: %v", err)
+			}
 		}
 	}
 }
