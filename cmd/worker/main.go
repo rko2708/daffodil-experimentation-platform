@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"daffodil-experimentation-platform/internal/repository"
 	"daffodil-experimentation-platform/internal/service" // Ensure this path is correct
 	"daffodil-experimentation-platform/pkg/database"
 
@@ -56,6 +57,8 @@ func main() {
 
 	log.Println("🚀 Worker started: Listening for order events...")
 
+	metricsRepo := repository.NewPostgresMetricsRepository(db)
+
 	for {
 		m, err := reader.ReadMessage(ctx)
 		if err != nil {
@@ -71,22 +74,28 @@ func main() {
 
 		log.Printf("📥 Received Event: User=%s, InstantSync=%v", event.UserID, event.InstantSync)
 
-		// 4. Update Database (Matches your new schema)
-		query := `
-            INSERT INTO user_metrics (user_id, orders_23d, total_spend, location_tag)
-            VALUES ($1, 1, $2, $3)
-            ON CONFLICT (user_id) DO UPDATE SET
-                orders_23d = user_metrics.orders_23d + 1,
-                total_spend = user_metrics.total_spend + EXCLUDED.total_spend,
-                location_tag = EXCLUDED.location_tag,
-                last_updated = NOW();
-        `
-		_, err = db.Exec(query, event.UserID, event.Amount, event.Location)
-
+		err = metricsRepo.UpsertOrder(ctx, event.UserID, event.Amount, event.Location)
 		if err != nil {
-			log.Printf("Failed to update DB: %v", err)
+			log.Printf("Repo Error: %v", err)
 			continue
 		}
+
+		// // 4. Update Database (Matches your new schema)
+		// query := `
+		//     INSERT INTO user_metrics (user_id, orders_23d, total_spend, location_tag)
+		//     VALUES ($1, 1, $2, $3)
+		//     ON CONFLICT (user_id) DO UPDATE SET
+		//         orders_23d = user_metrics.orders_23d + 1,
+		//         total_spend = user_metrics.total_spend + EXCLUDED.total_spend,
+		//         location_tag = EXCLUDED.location_tag,
+		//         last_updated = NOW();
+		// `
+		// _, err = db.Exec(query, event.UserID, event.Amount, event.Location)
+
+		// if err != nil {
+		// 	log.Printf("Failed to update DB: %v", err)
+		// 	continue
+		// }
 		log.Printf("Updated metrics for user: %s", event.UserID)
 
 		// 5. TRIGGER EVALUATION (The Missing Link)

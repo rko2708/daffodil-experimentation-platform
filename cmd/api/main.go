@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"daffodil-experimentation-platform/internal/repository"
 	"daffodil-experimentation-platform/internal/service"
 	"daffodil-experimentation-platform/pkg/config"
 	"daffodil-experimentation-platform/pkg/database"
@@ -20,6 +21,7 @@ var (
 	db          *sql.DB
 	rdb         *redis.Client
 	kafkaWriter *kafka.Writer
+	metricsRepo repository.MetricsRepository
 	ctx         = context.Background()
 )
 
@@ -42,6 +44,8 @@ func main() {
 	// 1. Connect to Redis
 	rdb = redis.NewClient(&redis.Options{Addr: "localhost:6379"})
 
+	metricsRepo = repository.NewPostgresMetricsRepository(db)
+
 	// 3. Setup Kafka Writer
 	kafkaWriter = &kafka.Writer{
 		Addr:     kafka.TCP("localhost:9092"),
@@ -51,7 +55,9 @@ func main() {
 
 	// 2. Define the endpoint
 	http.HandleFunc("/experiments", getExperiments)
-	http.HandleFunc("/users", handleUsers)
+	http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		handleUsers(w, r, metricsRepo)
+	})
 	http.HandleFunc("/place-order", handlePlaceOrder)
 	http.HandleFunc("/evaluate", runEvaluation)
 
@@ -102,7 +108,7 @@ func getExperiments(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func handleUsers(w http.ResponseWriter, r *http.Request) {
+func handleUsers(w http.ResponseWriter, r *http.Request, repo repository.MetricsRepository) {
 	switch r.Method {
 	case http.MethodGet:
 		rows, err := db.Query("SELECT user_id, orders_23d FROM user_metrics")
@@ -127,7 +133,8 @@ func handleUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		json.NewDecoder(r.Body).Decode(&req)
 
-		_, err := db.Exec("INSERT INTO user_metrics (user_id, orders_23d) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING", req.UserID)
+		// _, err := db.Exec("INSERT INTO user_metrics (user_id, orders_23d) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING", req.UserID)
+		err := metricsRepo.EnsureUser(r.Context(), req.UserID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
