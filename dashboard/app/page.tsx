@@ -11,7 +11,6 @@ export default function Dashboard() {
   const [orderCount, setOrderCount] = useState<number>(1);
   const [isInstant, setIsInstant] = useState(true);
 
-  // Load users on mount
   const refreshUsers = async () => {
     const data = await api.getUsers();
     setUsers(data);
@@ -19,7 +18,6 @@ export default function Dashboard() {
 
   useEffect(() => { refreshUsers(); }, []);
 
-  // Fetch experiments when user changes
   useEffect(() => {
     if (selectedUser) {
       api.getExperiments(selectedUser).then(setExp);
@@ -29,12 +27,9 @@ export default function Dashboard() {
   const handleSimulateOrders = async () => {
     if (!selectedUser) return;
     setLoading(true);
-
-    // We now pass the dynamic count and the instant flag
     await api.placeOrders(selectedUser, orderCount, isInstant);
 
     if (isInstant) {
-      // Wait briefly for the worker to finish, then refresh
       setTimeout(async () => {
         await refreshUsers();
         const newExp = await api.getExperiments(selectedUser);
@@ -43,7 +38,6 @@ export default function Dashboard() {
       }, 1000);
     } else {
       setLoading(false);
-      alert("Order placed in background. Wait for Cron or click 'Sync' to see changes.");
     }
   };
 
@@ -58,132 +52,172 @@ export default function Dashboard() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserId) return;
-
     await api.createUser(newUserId);
     setNewUserId('');
-    await refreshUsers(); // Refresh the list
+    await refreshUsers();
   };
 
   return (
-    <main className="flex min-h-screen bg-gray-950 text-white p-8 font-sans">
-      {/* Sidebar: User List */}
-      <div className="w-1/4 border-r border-gray-800 pr-6">
-        <h2 className="text-xl font-bold mb-6 text-blue-400">Target Users</h2>
-
-        <form onSubmit={handleCreateUser} className="mb-8">
-          <div className="flex flex-col gap-2">
-            <input
-              type="text"
-              placeholder="Enter User ID (e.g. U99)"
-              value={newUserId}
-              onChange={(e) => setNewUserId(e.target.value.toUpperCase())}
-              className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
-            />
-            <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-xs font-bold py-2 rounded transition-colors">
-              + ADD NEW USER
-            </button>
+    <div className="min-h-screen bg-[#080808] text-white font-sans">
+      <header className="flex items-center justify-between p-6 bg-[#080808] border-b border-[#2DD283]/10">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#2DD283] rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(45,210,131,0.3)]">
+            <span className="text-black font-black text-2xl mt-[-2px]">S</span>
           </div>
-        </form>
-
-        <div className="space-y-3">
-          {users.map(u => (
-            <button
-              key={u.user_id}
-              onClick={() => setSelectedUser(u.user_id)}
-              className={`w-full text-left p-4 rounded-lg border ${selectedUser === u.user_id ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-900 border-gray-800 hover:border-gray-600'}`}
-            >
-              <div className="font-mono font-bold">{u.user_id}</div>
-              <div className="text-sm text-gray-400">{u.orders} Total Orders</div>
-            </button>
-          ))}
+          <div>
+            <h1 className="text-xl font-black tracking-tight text-white uppercase italic leading-none">
+              Swish <span className="text-[#2DD283]">Labs</span>
+            </h1>
+            <p className="text-[10px] text-[#2DD283] font-bold tracking-widest uppercase opacity-80 mt-1">
+              Delight Delivered in 10 Mins
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Main Panel: Experiment Simulation */}
-      <div className="flex-1 pl-12">
-        {!selectedUser ? (
-          <div className="h-full flex items-center justify-center text-gray-500 italic">
-            Select a user to simulate experiments
+        <div className="flex items-center gap-4 text-right">
+          <button 
+            onClick={handleSync}
+            className="text-[10px] font-bold text-[#2DD283] border border-[#2DD283]/30 px-3 py-1 rounded-full hover:bg-[#2DD283]/10 transition-all"
+          >
+            🔄 FORCE SYNC ENGINE
+          </button>
+          <div className="px-3 py-1 bg-[#2DD283]/10 rounded-full border border-[#2DD283]/20">
+            <span className="text-[#2DD283] text-[10px] font-bold">SYSTEM ACTIVE</span>
           </div>
-        ) : (
-          <div className="max-w-3xl">
-            <header className="flex justify-between items-center mb-10">
-              <div>
-                <h1 className="text-3xl font-black">User: {selectedUser}</h1>
-                <p className="text-gray-400">Current Segments: {exp?.segments.join(', ') || 'None'}</p>
+        </div>
+      </header>
+
+      <main className="flex p-8 gap-8">
+        {/* Sidebar: User List */}
+        <div className="w-1/4">
+          <h2 className="text-[#2DD283] font-black uppercase italic tracking-widest text-sm mb-4">Target Users</h2>
+
+          <form onSubmit={handleCreateUser} className="mb-6">
+            <div className="flex flex-col gap-2">
+              <input
+                type="text"
+                placeholder="User ID (e.g. U99)"
+                value={newUserId}
+                onChange={(e) => setNewUserId(e.target.value.toUpperCase())}
+                className="bg-[#121212] border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-[#2DD283] outline-none transition-all" />
+              <button type="submit" className="bg-white text-black hover:bg-[#2DD283] transition-colors text-xs font-black py-3 rounded-xl uppercase tracking-tighter">
+                + Enroll New User
+              </button>
+            </div>
+          </form>
+
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+            {users.map(u => (
+              <button
+                key={u.user_id}
+                onClick={() => setSelectedUser(u.user_id)}
+                className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedUser === u.user_id ? 'bg-[#2DD283]/10 border-[#2DD283] shadow-[0_0_15px_rgba(45,210,131,0.1)]' : 'bg-[#121212] border-white/5 hover:border-white/20'}`}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-black italic text-lg">{u.user_id}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${u.orders >= 25 ? 'bg-[#2DD283] text-black' : 'bg-white/10 text-white/50'}`}>
+                    {u.orders >= 25 ? 'POWER' : 'BASIC'}
+                  </span>
+                </div>
+                <div className="text-xs font-medium text-gray-500 mt-1">{u.orders} Total Orders</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Panel */}
+        <div className="flex-1 bg-[#121212] rounded-[32px] p-10 border border-white/5">
+          {!selectedUser ? (
+            <div className="h-full flex flex-col items-center justify-center text-gray-600">
+              <div className="w-16 h-16 border-4 border-dashed border-gray-800 rounded-full mb-4 animate-spin-slow"></div>
+              <p className="italic font-medium">Select a Delight Centre User to simulate experiments</p>
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto">
+              <div className="flex justify-between items-start mb-12">
+                <div>
+                  <div className="text-[#2DD283] text-[10px] font-black tracking-[0.3em] uppercase mb-2">Active Session</div>
+                  <h1 className="text-5xl font-black italic tracking-tighter">USER: {selectedUser}</h1>
+                </div>
+                <div className="text-right">
+                  <div className="text-gray-500 text-[10px] font-bold uppercase mb-1">Assigned Segments</div>
+                  <div className="flex gap-2 justify-end">
+                    {exp?.segments.length ? exp.segments.map(s => (
+                      <span key={s} className="bg-[#2DD283] text-black text-[10px] font-extrabold px-3 py-1 rounded-full">{s.toUpperCase()}</span>
+                    )) : <span className="text-gray-700 italic text-sm font-medium">No Active Segments</span>}
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-col gap-4 bg-gray-900 p-6 rounded-xl border border-gray-800 mb-8">
-                <div className="flex items-center gap-4">
+
+              {/* Order Simulation Control */}
+              <div className="bg-black/40 rounded-[24px] p-8 border border-white/5 mb-10">
+                <div className="flex items-center gap-6">
                   <div className="flex-1">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Number of Orders</label>
+                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Load Volume</label>
                     <input
                       type="number"
                       value={orderCount}
                       onChange={(e) => setOrderCount(parseInt(e.target.value) || 0)}
-                      className="w-full bg-black border border-gray-700 rounded px-4 py-2 text-xl font-mono focus:border-orange-500 outline-none"
-                    />
+                      className="w-full bg-black border border-white/10 rounded-xl px-5 py-4 text-3xl font-black italic focus:border-[#2DD283] outline-none transition-all text-[#2DD283]" />
                   </div>
-                  <button
-                    onClick={handleSimulateOrders}
-                    disabled={loading}
-                    className="bg-orange-600 hover:bg-orange-500 px-8 py-4 mt-5 rounded-lg font-black transition-all disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {loading ? 'Processing...' : `🚀 Place ${orderCount} Orders`}
-                  </button>
+                  <div className="flex-1 pt-6">
+                    <button
+                      onClick={handleSimulateOrders}
+                      disabled={loading}
+                      className="w-full bg-[#2DD283] hover:bg-[#25b570] text-black px-8 py-5 rounded-2xl font-black italic text-xl transition-all disabled:opacity-50 shadow-[0_10px_30px_rgba(45,210,131,0.2)] active:scale-95"
+                    >
+                      {loading ? 'SWISHING...' : `🚀 Place ${orderCount} Orders`}
+                    </button>
+                    <label className="flex items-center justify-center gap-2 mt-4 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={isInstant}
+                        onChange={(e) => setIsInstant(e.target.checked)}
+                        className="w-4 h-4 accent-[#2DD283]" />
+                      <span className="text-[10px] text-gray-500 font-bold group-hover:text-gray-300 transition-colors uppercase tracking-widest">Enable Hot Path Sync</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Experiment Features */}
+              <div className="grid gap-6">
+                <div className={`p-8 rounded-[24px] border-2 transition-all duration-500 ${exp?.features.show_pizza_tile ? 'border-[#2DD283] bg-[#2DD283]/5' : 'border-white/5 bg-white/[0.02] opacity-30 grayscale'}`}>
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">🍕</span>
+                      <h3 className="text-xl font-black italic uppercase">Exclusive Pizza Deal</h3>
+                    </div>
+                    {!exp?.features.show_pizza_tile && <span className="text-[10px] font-black uppercase bg-white/10 px-3 py-1 rounded-full">Locked</span>}
+                  </div>
+                  <p className="text-sm text-gray-500 font-medium">Power users receive 15% extra delight on all pizza categories.</p>
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isInstant}
-                    onChange={(e) => setIsInstant(e.target.checked)}
-                    className="w-4 h-4 accent-orange-500"
-                  />
-                  <span className="text-sm text-gray-400 font-medium">Use "Hot Path" (Instant Segment Refresh)</span>
-                </label>
-              </div>
-              <button
-                onClick={handleSync}
-                className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-full font-bold ml-2"
-              >
-                🔄 Sync Segments
-              </button>
-            </header>
-
-            {/* Dynamic UI Rendering based on Experiment API */}
-            <div className="grid gap-6">
-              {/* Feature 1: The Pizza Tile */}
-              <div className={`p-8 rounded-2xl border-2 transition-all ${exp?.features.show_pizza_tile ? 'border-yellow-500 bg-yellow-500/10' : 'border-gray-800 bg-gray-900 opacity-40'}`}>
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-bold">🍕 Exclusive Pizza Deal</h3>
-                  {!exp?.features.show_pizza_tile && <span className="text-xs uppercase bg-gray-700 px-2 py-1 rounded">Locked</span>}
+                <div className={`h-40 rounded-[24px] relative overflow-hidden flex items-center justify-center transition-all duration-700 ${exp?.features.home_banner ? 'bg-gradient-to-br from-[#2DD283] to-[#1a8a54]' : 'bg-[#1a1a1a] border border-white/5'}`}>
+                  <span className={`text-3xl font-black italic uppercase tracking-tighter ${exp?.features.home_banner ? 'text-black' : 'text-white/10'}`}>
+                    {exp?.features.home_banner || "Standard Welcome"}
+                  </span>
+                  {exp?.features.discount_pct && (
+                    <div className="absolute bottom-4 right-6 bg-black text-[#2DD283] text-lg font-black italic px-4 py-1 rounded-lg transform -rotate-3 animate-pulse">
+                      {exp.features.discount_pct}% OFF
+                    </div>
+                  )}
                 </div>
-                <p className="mt-2 text-gray-400">This tile only appears for users in the "Power User" segment.</p>
-              </div>
 
-              {/* Feature 2: The Banner */}
-              <div className="h-32 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center relative overflow-hidden">
-                <span className="text-2xl font-black italic uppercase tracking-widest">
-                  {exp?.features.home_banner || "Standard Welcome"}
-                </span>
-                {exp?.features.discount_pct && (
-                  <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-bounce">
-                    {exp.features.discount_pct}% OFF
+                <div className="mt-8">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-1.5 h-1.5 bg-[#2DD283] rounded-full"></div>
+                    <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Engine Response Debugger</h4>
                   </div>
-                )}
-              </div>
-
-              {/* Raw JSON Debugger */}
-              <div className="mt-8">
-                <h4 className="text-xs font-mono text-gray-500 uppercase mb-2">Raw Experiment Payload</h4>
-                <pre className="bg-black p-4 rounded border border-gray-800 text-green-400 text-sm overflow-auto">
-                  {JSON.stringify(exp, null, 2)}
-                </pre>
+                  <pre className="bg-black/60 p-6 rounded-2xl border border-white/5 text-[#2DD283] text-xs font-mono overflow-auto leading-relaxed shadow-inner">
+                    {JSON.stringify(exp, null, 2)}
+                  </pre>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
-    </main>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }

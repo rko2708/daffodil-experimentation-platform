@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Swish Brand Palette */
+  --swish-green: #2DD283;
+  --swish-mint: #C0F0CD;
+  
+  /* Light Mode (Optional, but let's keep it Swish-themed) */
+  --background: #F4F7F5;
+  --foreground: #0D0D0D;
+  --card-bg: #ffffff;
+  --border-color: #E2E8E5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Pure Swish Dark Mode */
+    --background: #080808; /* Deep black like the app */
+    --foreground: #ffffff;
+    --card-bg: #121212;   /* Elevated charcoal cards */
+    --border-color: #2DD2831A; /* Subtle green border (10% opacity) */
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Using a cleaner, more modern font stack */
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Custom Scrollbar for that Swish Green vibe */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2DD2834D;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--swish-green);
+}
+
+/* Global utility for Swish Glow */
+.swish-glow {
+  box-shadow: 0 0 20px rgba(45, 210, 131, 0.15);
+}
+
+.swish-border {
+  border: 1px solid var(--border-color);
 }
